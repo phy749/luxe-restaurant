@@ -1,0 +1,62 @@
+spring:
+  profiles:
+    active: dev
+    
+  datasource:
+    url: jdbc:mysql://localhost:3306/luxe_restaurant?useUnicode=true&characterEncoding=utf8&useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
+    username: root
+    password: duynguyen123#
+    hikari:
+      maximum-pool-size: 10
+      minimum-idle: 2
+      idle-timeout: 300000
+      connection-timeout: 20000
+
+  jpa:
+    hibernate:
+      ddl-auto: update
+    properties:
+      hibernate:
+        format_sql: true
+        jdbc:
+          batch_size: 20
+        order_inserts: true
+        order_updates: true
+    show-sql: false
+    open-in-view: false
+
+  # Disable Redis for development
+  cache:
+    type: simple  # Use simple in-memory cache instead of Redis
+    
+  flyway:
+    baseline-on-migrate: true
+
+  ai:
+    openai:
+      api-key: ${GEMINI_API_KEY:AIzaSyAijcwrpna9rYtaLQZl8BoeNZI6cBh9bU4}
+      chat:
+        base-url: https://generativelanguage.googleapis.com
+        completions-path: v1beta/openai/chat/completions
+        options:
+          model: gemini-2.5-flash
+
+  mail:
+    host: smtp.gmail.com
+    port: 587
+    username: ${MAIL_USERNAME:duycter0202@gmail.com}
+    password: ${MAIL_PASSWORD:sqnbidcnybaosnqi}
+    properties:
+      mail:
+        smtp:
+          auth: true
+          starttls:
+            enable: true
+
+# Logging configuration
+logging:
+  level:
+    com.luxe_restaurant: INFO
+    org.springframework.cache: INFO
+    org.hibernate.SQL: WARN
+    org.hibernate.type.descriptor.sql.BasicBinder: WARN
