@@ -8,14 +8,20 @@ import com.luxe_restaurant.domain.repositories.CategoryRepository;
 import com.luxe_restaurant.domain.repositories.DishRepository;
 import com.luxe_restaurant.domain.services.DishService;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.modelmapper.ModelMapper;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
+@Transactional
 public class DishServiceImpl implements DishService {
 
     private final DishRepository dishRepository;
@@ -35,25 +41,34 @@ public class DishServiceImpl implements DishService {
     }
 
     @Override
+    @CacheEvict(value = "dishes", allEntries = true)
     public DishResponse createDish(DishRequest dishRequest) {
-        // Tìm danh mục, nếu không thấy thì để null (không báo lỗi 500)
+        log.info("Creating dish: {}", dishRequest.getDishName());
+        
+        // Validate category exists
         Category category = null;
         if (dishRequest.getCategoryId() != null) {
-            category = categoryRepository.findById(dishRequest.getCategoryId()).orElse(null);
+            category = categoryRepository.findById(dishRequest.getCategoryId())
+                    .orElseThrow(() -> new IllegalArgumentException("Category not found with ID: " + dishRequest.getCategoryId()));
         }
 
         Dish dish = modelMapper.map(dishRequest, Dish.class);
         dish.setId(null);
         dish.setCategory(category);
         dish.setDes(dishRequest.getDes());
-        dish.setActive(true); // Món mới mặc định là BẬT
+        dish.setActive(true);
 
-        Dish saveDish = dishRepository.save(dish);
-        return mapToResponse(saveDish);
+        Dish savedDish = dishRepository.save(dish);
+        log.info("Successfully created dish with ID: {}", savedDish.getId());
+        
+        return mapToResponse(savedDish);
     }
 
     @Override
+    @Cacheable(value = "dishes")
+    @Transactional(readOnly = true)
     public List<DishResponse> getAllDishes() {
+        log.debug("Fetching all dishes from database");
         return dishRepository.findAll()
                 .stream()
                 .map(this::mapToResponse)
@@ -61,13 +76,18 @@ public class DishServiceImpl implements DishService {
     }
 
     @Override
+    @CacheEvict(value = "dishes", allEntries = true)
     public DishResponse updateDish(Long id, DishRequest dishRequest) {
+        log.info("Updating dish with ID: {}", id);
+        
         Dish dish = dishRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Dish Not Found"));
+                .orElseThrow(() -> new IllegalArgumentException("Dish not found with ID: " + id));
 
+        // Validate category if provided
         Category category = null;
         if (dishRequest.getCategoryId() != null) {
-            category = categoryRepository.findById(dishRequest.getCategoryId()).orElse(null);
+            category = categoryRepository.findById(dishRequest.getCategoryId())
+                    .orElseThrow(() -> new IllegalArgumentException("Category not found with ID: " + dishRequest.getCategoryId()));
         }
 
         dish.setNameDish(dishRequest.getDishName());
@@ -76,30 +96,47 @@ public class DishServiceImpl implements DishService {
         dish.setUrlImage(dishRequest.getUrlImage());
         dish.setDes(dishRequest.getDes());
 
-        Dish update = dishRepository.save(dish);
-        return mapToResponse(update);
+        Dish updatedDish = dishRepository.save(dish);
+        log.info("Successfully updated dish with ID: {}", id);
+        
+        return mapToResponse(updatedDish);
     }
 
     @Override
+    @CacheEvict(value = "dishes", allEntries = true)
     public void deleteDish(Long id) {
+        log.info("Deleting dish with ID: {}", id);
+        
         Dish dish = dishRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Dish Not Found"));
+                .orElseThrow(() -> new IllegalArgumentException("Dish not found with ID: " + id));
+        
         dishRepository.delete(dish);
+        log.info("Successfully deleted dish with ID: {}", id);
     }
 
     @Override
+    @Transactional(readOnly = true)
     public DishResponse getDishById(Long id) {
+        log.debug("Finding dish with ID: {}", id);
+        
         Dish dish = dishRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Dish Not Found"));
+                .orElseThrow(() -> new IllegalArgumentException("Dish not found with ID: " + id));
+        
         return mapToResponse(dish);
     }
 
     @Override
+    @CacheEvict(value = "dishes", allEntries = true)
     public DishResponse toggleDishStatus(Long id) {
+        log.info("Toggling status for dish with ID: {}", id);
+        
         Dish dish = dishRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Dish Not Found"));
-        dish.setActive(!dish.isActive()); 
+                .orElseThrow(() -> new IllegalArgumentException("Dish not found with ID: " + id));
+        
+        dish.setActive(!dish.isActive());
         Dish updatedDish = dishRepository.save(dish);
+        
+        log.info("Successfully toggled status for dish with ID: {} to {}", id, updatedDish.isActive());
         return mapToResponse(updatedDish);
     }
 }
